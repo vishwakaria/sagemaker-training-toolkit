@@ -82,31 +82,36 @@ async def watch(stream, proc_per_host, error_classes=None):
         if not lines or lines == "":
             break
 
-        lines = lines.decode("utf-8").strip().split("\n")
-        for line in lines:
-            err_line = line
-            if "<stdout>" in line:
-                line = re.sub(
-                    r"\[(\d),(\d+)\]<stdout>",
-                    lambda x: (
-                        f"[{x[1]},mpirank:{x[2]},algo-{(int(x[2])//proc_per_host)+1}]<stdout>"
-                    ),
-                    line,
-                )
-            elif "<stderr>" in line:
-                line = re.sub(
-                    r"\[(\d),(\d+)\]<stderr>",
-                    lambda x: (
-                        f"[{x[1]},mpirank:{x[2]},algo-{(int(x[2])//proc_per_host)+1}]<stderr>"
-                    ),
-                    line,
-                )
+        try:
+            print("viskaria lines is: ")
+            print(lines)
+
+            lines = lines.decode("utf-8").strip().split("\n")
+            for line in lines:
+                err_line = line
+                if "<stdout>" in line:
+                    line = re.sub(
+                        r"\[(\d),(\d+)\]<stdout>",
+                        lambda x: (
+                            f"[{x[1]},mpirank:{x[2]},algo-{(int(x[2])//proc_per_host)+1}]<stdout>"
+                        ),
+                        line,
+                    )
+                elif "<stderr>" in line:
+                    line = re.sub(
+                        r"\[(\d),(\d+)\]<stderr>",
+                        lambda x: (
+                            f"[{x[1]},mpirank:{x[2]},algo-{(int(x[2])//proc_per_host)+1}]<stderr>"
+                        ),
+                        line,
+                    )
             print(line)
             # log only if necessary, remove node and rank id for de-duplication
             err_line = re.sub(r"\[(\d),(\d)\]<stderr>", "", err_line)
             # in case error piped to stdout
             err_line = re.sub(r"\[(\d),(\d)\]<stdout>", "", err_line)
-
+            print("err_line is " + err_line)
+            
             if start:
                 if err_line not in output:
                     output.append(err_line.strip(" :\n") + "\n")
@@ -122,6 +127,10 @@ async def watch(stream, proc_per_host, error_classes=None):
                     # start logging error message if target exceptions found
                     start = True
                     output.append(err_line.strip(" :\n") + "\n")
+        except errors.ClientError:
+            print("A client error occurred while decoding lines")
+        except:
+            print("Exception occurred while decoding lines")
 
     return " ".join(output)
 
