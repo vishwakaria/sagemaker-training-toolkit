@@ -27,6 +27,7 @@ from sagemaker_training import environment, errors, logging_config, process, tim
 
 logger = logging_config.get_logger()
 logging.getLogger("paramiko").setLevel(logging.INFO)
+LIB_ACCL_INSTALL_PATH = "/opt/conda/lib/libhccl.so"
 
 try:
     from smdistributed.dataparallel import exceptions
@@ -130,6 +131,10 @@ class SMDataParallelRunner(process.ProcessRunner):
         overridden_known_options, additional_options = _parse_custom_mpi_options(
             self._custom_mpi_options
         )
+        ld_preload_files = getfile(gethostname)
+        accl_enabled = self._is_accl_enabled()
+        if accl_enabled:
+            ld_preload_files += ":%s" % LIB_ACCL_INSTALL_PATH
 
         mpirun_command = [
             "mpirun",
@@ -179,7 +184,7 @@ class SMDataParallelRunner(process.ProcessRunner):
             "-x",
             "RDMAV_FORK_SAFE=1",
             "-x",
-            "LD_PRELOAD=%s" % getfile(gethostname),
+            "LD_PRELOAD=%s" % ld_preload_files,
         ]
 
         mpirun_command.extend(additional_options)
@@ -204,6 +209,9 @@ class SMDataParallelRunner(process.ProcessRunner):
                 ]
             )
 
+        if not accl_enabled:
+            mpirun_command.extend(["-x", "SMDATAPARALLEL_USE_ACCL=0"])
+
         smddprun_command = ["smddprun"]
         mpirun_command.extend(smddprun_command)
         return mpirun_command
@@ -219,6 +227,14 @@ class SMDataParallelRunner(process.ProcessRunner):
             instance_type = sm_training_env.get("current_instance_type", None)
         logger.info("instance type: %s" % instance_type)
         return instance_type
+
+    def _is_accl_enabled(self):
+        """Check if ACCL is enabled"""
+        sm_training_env = json.loads(self._env_vars.get("SM_TRAINING_ENV"))
+        accl_enabled = sm_training_env.get("additional_framework_parameters").get(
+            "sagemaker_accl_enabled", "True"
+        )
+        return eval(accl_enabled)
 
     def _create_command(self):
         """Create mpi-based smddprun command.
