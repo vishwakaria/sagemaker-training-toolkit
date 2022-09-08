@@ -23,7 +23,7 @@ import gethostname
 from sagemaker_training import environment, smdataparallel
 from test.unit.test_mpi import MockSSHClient
 
-LD_PRELOAD_PATH_ACCL_ENABLED = inspect.getfile(gethostname) + ":/opt/conda/lib/libhccl.so"
+LD_PRELOAD_PATH_ACCL_ENABLED = inspect.getfile(gethostname) + " /opt/conda/lib/libhccl.so"
 
 class AsyncMock(MagicMock):
     async def __call__(self, *args, **kwargs):
