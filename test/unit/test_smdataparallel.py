@@ -15,6 +15,7 @@ from __future__ import absolute_import
 import asyncio
 import inspect
 import os
+import json
 
 from mock import ANY, MagicMock, patch
 import pytest
@@ -23,7 +24,7 @@ import gethostname
 from sagemaker_training import environment, smdataparallel
 from test.unit.test_mpi import MockSSHClient
 
-LD_PRELOAD_PATH_ACCL_ENABLED = inspect.getfile(gethostname) + " /opt/conda/lib/libhccl.so"
+LD_PRELOAD_PATH_ACCL_ENABLED = inspect.getfile(gethostname) + ":/opt/conda/lib/libhccl.so"
 
 class AsyncMock(MagicMock):
     async def __call__(self, *args, **kwargs):
@@ -63,8 +64,15 @@ def test_smdataparallel_run_multi_node_python(
             user_entry_point="train.py",
             args=["-v", "--lr", "35"],
             env_vars={
-                "SM_TRAINING_ENV": '{"additional_framework_parameters":{"sagemaker_instance_type":"ml.p3.16xlarge", "sagemaker_accl_enabled": "True"}}'
-            },
+                    "SM_TRAINING_ENV": json.dumps(
+                        {
+                            "additional_framework_parameters": {
+                                "sagemaker_instance_type": "ml.p3.16xlarge",
+                                "sagemaker_accl_enabled": True
+                            }
+                        }
+                    ),
+                },
             processes_per_host=num_processes_per_host,
             master_hostname=master_hostname,
             hosts=hosts,
@@ -187,8 +195,15 @@ def test_smdataparallel_run_single_node_python(
             user_entry_point="train.py",
             args=["-v", "--lr", "35"],
             env_vars={
-                "SM_TRAINING_ENV": '{"additional_framework_parameters":{"sagemaker_instance_type":"ml.p4d.24xlarge", "sagemaker_accl_enabled": "True"}}'
-            },
+                    "SM_TRAINING_ENV": json.dumps(
+                        {
+                            "additional_framework_parameters": {
+                                "sagemaker_instance_type": "ml.p4d.24xlarge",
+                                "sagemaker_accl_enabled": True
+                            }
+                        }
+                    ),
+                },
             processes_per_host=num_processes_per_host,
             master_hostname=master_hostname,
             hosts=hosts,
@@ -420,8 +435,15 @@ def test_smdataparallel_run_accl_disabled_python(
             user_entry_point="train.py",
             args=["-v", "--lr", "35"],
             env_vars={
-                "SM_TRAINING_ENV": '{"additional_framework_parameters":{"sagemaker_instance_type":"ml.p3.16xlarge", "sagemaker_accl_enabled": "False"}}'
-            },
+                    "SM_TRAINING_ENV": json.dumps(
+                        {
+                            "additional_framework_parameters": {
+                                "sagemaker_instance_type": "ml.p3.16xlarge",
+                                "sagemaker_accl_enabled": False
+                            }
+                        }
+                    ),
+                },
             processes_per_host=num_processes_per_host,
             master_hostname=master_hostname,
             hosts=hosts,

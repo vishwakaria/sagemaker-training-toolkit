@@ -134,7 +134,7 @@ class SMDataParallelRunner(process.ProcessRunner):
         ld_preload_files = getfile(gethostname)
         accl_enabled = self._is_accl_enabled()
         if accl_enabled:
-            ld_preload_files += " %s" % LIB_ACCL_INSTALL_PATH
+            ld_preload_files += ":%s" % LIB_ACCL_INSTALL_PATH
 
         mpirun_command = [
             "mpirun",
@@ -232,9 +232,9 @@ class SMDataParallelRunner(process.ProcessRunner):
         """Check if ACCL is enabled"""
         sm_training_env = json.loads(self._env_vars.get("SM_TRAINING_ENV"))
         accl_enabled = sm_training_env.get("additional_framework_parameters").get(
-            "sagemaker_accl_enabled", "True"
+            "sagemaker_accl_enabled", True
         )
-        return eval(accl_enabled)
+        return accl_enabled
 
     def _create_command(self):
         """Create mpi-based smddprun command.
