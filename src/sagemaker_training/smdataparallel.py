@@ -133,8 +133,8 @@ class SMDataParallelRunner(process.ProcessRunner):
         )
         ld_preload_files = getfile(gethostname)
         accl_enabled = self._is_accl_enabled()
-        if accl_enabled:
-            ld_preload_files += ":%s" % LIB_ACCL_INSTALL_PATH
+        # if accl_enabled:
+        #     ld_preload_files += ":%s" % LIB_ACCL_INSTALL_PATH
 
         mpirun_command = [
             "mpirun",
