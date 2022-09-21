@@ -27,7 +27,6 @@ from sagemaker_training import environment, errors, logging_config, process, tim
 
 logger = logging_config.get_logger()
 logging.getLogger("paramiko").setLevel(logging.INFO)
-LIB_ACCL_INSTALL_PATH = "/opt/conda/lib/libhccl.so"
 
 try:
     from smdistributed.dataparallel import exceptions
@@ -131,10 +130,7 @@ class SMDataParallelRunner(process.ProcessRunner):
         overridden_known_options, additional_options = _parse_custom_mpi_options(
             self._custom_mpi_options
         )
-        ld_preload_files = getfile(gethostname)
         accl_enabled = self._is_accl_enabled()
-        # if accl_enabled:
-        #     ld_preload_files += ":%s" % LIB_ACCL_INSTALL_PATH
 
         mpirun_command = [
             "mpirun",
@@ -184,7 +180,7 @@ class SMDataParallelRunner(process.ProcessRunner):
             "-x",
             "RDMAV_FORK_SAFE=1",
             "-x",
-            "LD_PRELOAD=%s" % ld_preload_files,
+            "LD_PRELOAD=%s" % getfile(gethostname),
         ]
 
         mpirun_command.extend(additional_options)
@@ -232,9 +228,12 @@ class SMDataParallelRunner(process.ProcessRunner):
         """Check if ACCL is enabled"""
         sm_training_env = json.loads(self._env_vars.get("SM_TRAINING_ENV"))
         accl_enabled = sm_training_env.get("additional_framework_parameters").get(
-            "sagemaker_accl_enabled", True
+            "sagemaker_accl_enabled"
         )
-        return accl_enabled
+        is_accl_installed_with_permissions = _validate_accl_preload_libs(accl_enabled)
+        if accl_enabled is False or not is_accl_installed_with_permissions:
+            return False
+        return True
 
     def _create_command(self):
         """Create mpi-based smddprun command.
@@ -381,3 +380,38 @@ def _parse_custom_mpi_options(custom_mpi_options):
     parser.add_argument("--NCCL_DEBUG", default="INFO", type=str)
 
     return parser.parse_known_args(custom_mpi_options.split())
+
+
+def _validate_accl_preload_libs(use_accl):
+    """Check if ACCL libraries are present in container and have executable permissions"""
+    if use_accl is False:
+        return False
+
+    libaccl_path = "/opt/conda/lib/libaccl.so"
+    libacclcoll_path = "/opt/conda/lib/libacclcoll.so"
+
+    libaccl_exists = os.path.exists(libaccl_path)
+    libacclcoll_exists = os.path.exists(libacclcoll_path)
+    if not libaccl_exists or not libacclcoll_exists:
+        err_msg = (
+            "ACCL libraries are not present in the container. "
+            "Please follow <TBA> to setup ACCL on your container."
+        )
+        if use_accl:
+            raise ValueError(err_msg)
+        logger.warning(err_msg)
+        return False
+
+    libaccl_exec_permissions = os.access(libaccl_path, os.X_OK)
+    libacclcoll_exec_permissions = os.access(libacclcoll_path, os.X_OK)
+    if not libaccl_exec_permissions or not libacclcoll_exec_permissions:
+        err_msg = (
+            "ACCL libraries do not have executable permissions. "
+            "Please follow <TBA> to setup ACCL on your container."
+        )
+        if use_accl:
+            raise ValueError(err_msg)
+        logger.warning(err_msg)
+        return False
+
+    return True
